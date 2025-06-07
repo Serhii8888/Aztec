@@ -108,7 +108,8 @@ elif [[ "$choice" == "2" ]]; then
 elif [[ "$choice" == "3" ]]; then
     echo "Зупиняємо ноду..."
     screen -S aztec -X quit && echo "Нода зупинена." || echo "Сесія не знайдена."
-
+    docker ps -q --filter "ancestor=aztecprotocol/aztec" | xargs -r docker stop
+    docker ps -aq --filter "ancestor=aztecprotocol/aztec" | xargs -r docker rm
 else
     echo "Невірний вибір. Вихід."
     exit 1
