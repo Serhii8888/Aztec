@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 echo "Починаємо встановлення ноди Aztec..."
 
 # Запитуємо у користувача параметри
@@ -9,31 +11,43 @@ read -p "Введіть VALIDATOR_PRIVATE_KEY (ВАШ ПРИВАТНИЙ КЛЮ�
 read -p "Введіть COINBASE_ADDRESS (ВАШ АДРЕС 0x...): " COINBASE_ADDRESS
 
 echo ""
-echo "Крок 1/6: Встановлення Docker..."
+echo "Крок 1/7: Встановлення Docker через офіційний репозиторій..."
 
-curl -fsSL https://get.docker.com -o get-docker.sh && \
-sh get-docker.sh
+# Оновлення списку пакетів і встановлення залежностей
+sudo apt update
+sudo apt install -y \
+    ca-certificates \
+    curl \
+    gnupg \
+    lsb-release
 
-# Додаємо поточного користувача в групу docker (для доступу без sudo)
+# Додаємо офіційний GPG ключ Docker
+sudo mkdir -p /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+
+# Додаємо Docker репозиторій
+echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+  $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+# Оновлення і встановлення Docker Engine
+sudo apt update
+sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+# Додаємо користувача в групу docker
 sudo usermod -aG docker $USER
-
-# Оновлюємо групи поточного сеансу, щоб зміни вступили в силу
-newgrp docker
-
-# Приглушуємо вивід docker version (перевірка)
-docker version > /dev/null 2>&1 || true
 
 echo "Docker встановлено."
 
 echo ""
-echo "Крок 2/6: Встановлення додаткових утиліт..."
+echo "Крок 2/7: Встановлення додаткових утиліт..."
 
-sudo apt update && sudo apt install -y curl screen net-tools psmisc jq ufw nano
+sudo apt install -y screen net-tools psmisc jq ufw nano
 
 echo "Утиліти встановлено."
 
 echo ""
-echo "Крок 3/6: Встановлення AZTEC CLI..."
+echo "Крок 3/7: Встановлення AZTEC CLI..."
 
 curl -fsSL https://install.aztec.network | bash
 
@@ -44,20 +58,20 @@ export PATH="$HOME/.aztec/bin:$PATH"
 echo "AZTEC CLI встановлено та додано в PATH."
 
 echo ""
-echo "Крок 4/6: Оновлення AZTEC до останньої версії тестнету..."
+echo "Крок 4/7: Оновлення AZTEC до останньої версії тестнету..."
 
 aztec-up alpha-testnet
 
 echo "Оновлення завершено."
 
 echo ""
-echo "Крок 5/6: Отримуємо IP сервера..."
+echo "Крок 5/7: Отримуємо IP сервера..."
 
 IP=$(curl -s https://api.ipify.org)
 echo "IP сервера: $IP"
 
 echo ""
-echo "Крок 6/6: Створення скриптів запуску і зупинки ноди..."
+echo "Крок 6/7: Створення скриптів запуску і зупинки ноди..."
 
 # Скрипт запуску
 cat > $HOME/start_aztec_node.sh << EOL
@@ -94,7 +108,7 @@ EOL
 chmod +x $HOME/stop_aztec_node.sh
 
 echo ""
-echo "Встановлення завершено."
+echo "Крок 7/7: Завершення. Нода готова."
 
 echo ""
 echo "Для запуску ноди в сесії screen натисніть 1"
@@ -115,3 +129,5 @@ elif [[ "$choice" == "2" ]]; then
 else
     echo "Невірний вибір. Вихід."
 fi
+
+#echo "ВАЖЛИВО: Якщо ви тільки що додали себе в групу docker, щоб зміни вступили в силу — вийдіть із системи і зайдіть знову."
