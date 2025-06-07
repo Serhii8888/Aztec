@@ -1,0 +1,98 @@
+#!/bin/bash
+
+echo "Починаємо встановлення ноди Aztec..."
+
+# Запитуємо у користувача параметри
+read -p "Введіть L1_RPC_URL (ВАШ SEPOLIA RPC): " L1_RPC_URL
+read -p "Введіть L1_CONSENSUS_URL (ВАШ SEPOLIA Beacon): " L1_CONSENSUS_URL
+read -p "Введіть VALIDATOR_PRIVATE_KEY (ВАШ ПРИВАТНИЙ КЛЮЧ): " VALIDATOR_PRIVATE_KEY
+read -p "Введіть COINBASE_ADDRESS (ВАШ АДРЕС 0x...): " COINBASE_ADDRESS
+
+echo "Встановлюємо необхідні утиліти..."
+
+# Встановлення docker
+curl -fsSL https://get.docker.com -o get-docker.sh
+sh get-docker.sh
+sudo usermod -aG docker $USER
+newgrp docker
+docker --version
+
+# Встановлення інших утиліт
+sudo apt update && sudo apt install -y curl screen net-tools psmisc jq ufw nano
+
+echo "Встановлюємо AZTEC CLI..."
+
+curl -fsSL https://install.aztec.network | bash
+
+# Додаємо aztec до PATH
+export PATH="$HOME/.aztec/bin:$PATH"
+echo 'export PATH="$HOME/.aztec/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+
+echo "Оновлюємо до останньої версії тестнету..."
+aztec-up alpha-testnet
+
+# Отримуємо IP сервера
+IP=$(curl -s https://api.ipify.org)
+
+echo "Створюємо скрипт запуску ноди..."
+
+cat > $HOME/start_aztec_node.sh << EOL
+#!/bin/bash
+export PATH=\$PATH:\$HOME/.aztec/bin
+aztec start --node --archiver --sequencer --auto-update config-and-version \\
+  --network alpha-testnet \\
+  --port 8080 \\
+  --l1-rpc-urls $L1_RPC_URL \\
+  --l1-consensus-host-urls $L1_CONSENSUS_URL \\
+  --sequencer.validatorPrivateKey $VALIDATOR_PRIVATE_KEY \\
+  --sequencer.coinbase $COINBASE_ADDRESS \\
+  --p2p.p2pIp $IP
+EOL
+
+chmod +x $HOME/start_aztec_node.sh
+
+echo "Створюємо скрипт безперервного запуску (авторестарту)..."
+
+cat > $HOME/run_forever.sh << EOL
+#!/bin/bash
+while true; do
+  ./start_aztec_node.sh
+  echo "Нода зупинилась. Перезапуск через 90 секунд..."
+  sleep 90
+done
+EOL
+
+chmod +x $HOME/run_forever.sh
+
+echo "Створюємо скрипт для зупинки ноди..."
+
+cat > $HOME/stop_aztec_node.sh << EOL
+#!/bin/bash
+# Зупинка сесії screen з назвою 'aztec', щоб нода не перезапускалась
+screen -S aztec -X quit
+echo "Нода зупинена."
+EOL
+
+chmod +x $HOME/stop_aztec_node.sh
+
+echo ""
+echo "Для запуску ноди в окремій сесії screen натисніть 1"
+echo "Для зупинки ноди натисніть 2"
+read -p "Ваш вибір (1 або 2): " choice
+
+if [[ "$choice" == "1" ]]; then
+    # Перевіряємо, чи вже існує сесія screen з назвою aztec
+    if screen -list | grep -q "\.aztec"; then
+        echo "Сесія screen 'aztec' вже запущена."
+    else
+        echo "Створюємо сесію screen 'aztec' і запускаємо ноду..."
+        screen -dmS aztec bash -c "$HOME/run_forever.sh"
+        echo "Нода запущена в сесії screen з назвою 'aztec'."
+    fi
+elif [[ "$choice" == "2" ]]; then
+    echo "Зупиняємо ноду..."
+    $HOME/stop_aztec_node.sh
+else
+    echo "Невірний вибір. Вихід."
+fi
