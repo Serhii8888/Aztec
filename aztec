@@ -2,58 +2,65 @@
 
 set -e
 
-clear
-echo "============================="
-echo "   Меню Aztec Node Script   "
-echo "============================="
+echo "Виберіть дію:"
 echo "1. Встановити ноду"
 echo "2. Запустити ноду"
 echo "3. Зупинити ноду"
-echo "============================="
-read -p "Ваш вибір (1/2/3): " action
+read -p "Ваш вибір (1/2/3): " choice
 
-if [[ "$action" == "1" ]]; then
-  echo "Починаємо встановлення ноди Aztec..."
+if [[ "$choice" == "1" ]]; then
+    echo "Починаємо встановлення ноди Aztec..."
 
-  # Запитуємо параметри
-  read -p "Введіть L1_RPC_URL (ВАШ SEPOLIA RPC): " L1_RPC_URL
-  read -p "Введіть L1_CONSENSUS_URL (ВАШ SEPOLIA Beacon): " L1_CONSENSUS_URL
-  read -p "Введіть VALIDATOR_PRIVATE_KEY (ВАШ ПРИВАТНИЙ КЛЮЧ): " VALIDATOR_PRIVATE_KEY
-  read -p "Введіть COINBASE_ADDRESS (ВАШ АДРЕС 0x...): " COINBASE_ADDRESS
+    # Запит параметрів
+    read -p "Введіть L1_RPC_URL (ВАШ SEPOLIA RPC): " L1_RPC_URL
+    read -p "Введіть L1_CONSENSUS_URL (ВАШ SEPOLIA Beacon): " L1_CONSENSUS_URL
+    read -p "Введіть VALIDATOR_PRIVATE_KEY (ВАШ ПРИВАТНИЙ КЛЮЧ): " VALIDATOR_PRIVATE_KEY
+    read -p "Введіть COINBASE_ADDRESS (ВАШ АДРЕС 0x...): " COINBASE_ADDRESS
 
-  echo "\n[1/7] Оновлення системи та встановлення залежностей..."
-  sudo apt update && sudo apt install -y \
-    ca-certificates \
-    curl \
-    gnupg \
-    lsb-release \
-    screen \
-    net-tools \
-    psmisc \
-    jq \
-    ufw \
-    nano
+    echo ""
+    echo "Крок 1/7: Встановлення Docker..."
 
-  echo "\n[2/7] Встановлення Docker..."
-  curl -fsSL https://get.docker.com | sh
-  sudo usermod -aG docker $USER
-  echo "Docker встановлено. Якщо встановлюєте вперше — перелогіньтеся."
+    sudo apt update
+    sudo apt install -y apt-transport-https ca-certificates curl gnupg lsb-release
 
-  echo "\n[3/7] Встановлення AZTEC CLI..."
-  curl -fsSL https://install.aztec.network | bash
-  echo 'export PATH="$HOME/.aztec/bin:$PATH"' >> ~/.bashrc
-  export PATH="$HOME/.aztec/bin:$PATH"
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker.gpg
 
-  echo "\n[4/7] Оновлення до останньої версії..."
-  aztec-up alpha-testnet
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+    $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 
-  echo "\n[5/7] Отримання IP-адреси..."
-  IP=$(curl -s https://api.ipify.org)
-  echo "IP сервера: $IP"
+    sudo apt update
+    sudo apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
 
-  echo "\n[6/7] Створення скриптів запуску і зупинки..."
+    sudo usermod -aG docker $USER
 
-  cat > $HOME/start_aztec_node.sh << EOL
+    echo "Docker встановлено."
+
+    echo ""
+    echo "Крок 2/7: Встановлення утиліт..."
+
+    sudo apt install -y screen net-tools psmisc jq ufw nano
+
+    echo ""
+    echo "Крок 3/7: Встановлення AZTEC CLI..."
+
+    curl -fsSL https://install.aztec.network | bash
+    echo 'export PATH="$HOME/.aztec/bin:$PATH"' >> ~/.bashrc
+    export PATH="$HOME/.aztec/bin:$PATH"
+
+    echo ""
+    echo "Крок 4/7: Оновлення AZTEC до alpha-testnet..."
+    aztec-up alpha-testnet
+
+    echo ""
+    echo "Крок 5/7: Отримання публічного IP..."
+    IP=$(curl -s https://api.ipify.org)
+    echo "IP сервера: $IP"
+
+    echo ""
+    echo "Крок 6/7: Створення скриптів запуску/зупинки..."
+
+    # start script
+    cat > $HOME/start_aztec_node.sh << EOL
 #!/bin/bash
 export PATH=\$PATH:\$HOME/.aztec/bin
 aztec start --node --archiver --sequencer --auto-update config-and-version \\
@@ -65,40 +72,44 @@ aztec start --node --archiver --sequencer --auto-update config-and-version \\
   --sequencer.coinbase $COINBASE_ADDRESS \\
   --p2p.p2pIp $IP
 EOL
-  chmod +x $HOME/start_aztec_node.sh
+    chmod +x $HOME/start_aztec_node.sh
 
-  cat > $HOME/run_forever.sh << EOL
+    # run_forever script
+    cat > $HOME/run_forever.sh << EOL
 #!/bin/bash
 while true; do
-  ./start_aztec_node.sh
+  \$HOME/start_aztec_node.sh
   echo "Нода зупинилась. Перезапуск через 90 секунд..."
   sleep 90
 done
 EOL
-  chmod +x $HOME/run_forever.sh
+    chmod +x $HOME/run_forever.sh
 
-  cat > $HOME/stop_aztec_node.sh << EOL
+    # stop script
+    cat > $HOME/stop_aztec_node.sh << EOL
 #!/bin/bash
 screen -S aztec -X quit
 echo "Нода зупинена."
 EOL
-  chmod +x $HOME/stop_aztec_node.sh
+    chmod +x $HOME/stop_aztec_node.sh
 
-  echo "\n[7/7] Встановлення завершено. Ви можете запустити ноду, обравши 2 в меню."
+    echo ""
+    echo "Крок 7/7: Встановлення завершено."
 
-elif [[ "$action" == "2" ]]; then
-  echo "Запуск ноди в screen-сесії 'aztec'..."
-  if screen -list | grep -q "\.aztec"; then
-    echo "Сесія 'aztec' вже існує. Перевірте її через 'screen -r aztec'."
-  else
-    screen -dmS aztec bash -c "$HOME/run_forever.sh"
-    echo "Нода запущена в screen-сесії 'aztec'."
-  fi
+elif [[ "$choice" == "2" ]]; then
+    echo "Запускаємо ноду в screen-сесії..."
+    if screen -list | grep -q "\.aztec"; then
+        echo "Нода вже запущена (екран знайдено)."
+    else
+        screen -dmS aztec bash -c "$HOME/run_forever.sh"
+        echo "Нода запущена у фоновому режимі."
+    fi
 
-elif [[ "$action" == "3" ]]; then
-  echo "Зупинка ноди..."
-  bash $HOME/stop_aztec_node.sh
+elif [[ "$choice" == "3" ]]; then
+    echo "Зупиняємо ноду..."
+    screen -S aztec -X quit && echo "Нода зупинена." || echo "Сесія не знайдена."
 
 else
-  echo "Невірний вибір. Спробуйте ще раз."
+    echo "Невірний вибір. Вихід."
+    exit 1
 fi
