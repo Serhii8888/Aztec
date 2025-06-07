@@ -102,6 +102,8 @@ EOL
 
     elif [[ "$choice" == "3" ]]; then
         echo "Зупиняємо ноду..."
+        docker ps -q --filter "ancestor=aztecprotocol/aztec:latest" | xargs -r docker stop
+        docker ps -aq --filter "ancestor=aztecprotocol/aztec:latest" | xargs -r docker rm
         screen -S aztec -X quit && echo "Нода зупинена." || echo "Сесія не знайдена."
 
     elif [[ "$choice" == "4" ]]; then
