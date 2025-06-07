@@ -83,8 +83,8 @@ EOL
 #!/bin/bash
 while true; do
   \$HOME/start_aztec_node.sh
-  echo "Нода зупинилась. Перезапуск через 90 секунд..."
-  sleep 90
+  echo "Нода зупинилась. Перезапуск через 15 секунд..."
+  sleep 15
 done
 EOL
             chmod +x $HOME/run_forever.sh
