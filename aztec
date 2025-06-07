@@ -68,7 +68,13 @@ EOL
         cat > $HOME/run_forever.sh << EOL
 #!/bin/bash
 while true; do
-  \$HOME/start_aztec_node.sh
+  echo "Зупиняємо попередні контейнери..."
+  docker ps -q --filter "name=aztec" | xargs -r docker stop
+  docker ps -aq --filter "name=aztec" | xargs -r docker rm
+
+  echo "Запускаємо ноду..."
+  $HOME/start_aztec_node.sh
+
   echo "Нода зупинилась. Перезапуск через 90 секунд..."
   sleep 90
 done
