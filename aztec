@@ -8,35 +8,50 @@ read -p "Введіть L1_CONSENSUS_URL (ВАШ SEPOLIA Beacon): " L1_CONSENSUS
 read -p "Введіть VALIDATOR_PRIVATE_KEY (ВАШ ПРИВАТНИЙ КЛЮЧ): " VALIDATOR_PRIVATE_KEY
 read -p "Введіть COINBASE_ADDRESS (ВАШ АДРЕС 0x...): " COINBASE_ADDRESS
 
-echo "Встановлюємо необхідні утиліти..."
+echo ""
+echo "Крок 1/6: Встановлення Docker..."
 
-# Встановлення docker
-curl -fsSL https://get.docker.com -o get-docker.sh
-sh get-docker.sh
-sudo usermod -aG docker $USER
+curl -fsSL https://get.docker.com -o get-docker.sh && \
+sh get-docker.sh && \
+sudo usermod -aG docker $USER && \
 newgrp docker
-docker --version
 
-# Встановлення інших утиліт
+echo "Docker встановлено."
+
+echo ""
+echo "Крок 2/6: Встановлення додаткових утиліт..."
+
 sudo apt update && sudo apt install -y curl screen net-tools psmisc jq ufw nano
 
-echo "Встановлюємо AZTEC CLI..."
+echo "Утиліти встановлено."
+
+echo ""
+echo "Крок 3/6: Встановлення AZTEC CLI..."
 
 curl -fsSL https://install.aztec.network | bash
 
-# Додаємо aztec до PATH
-export PATH="$HOME/.aztec/bin:$PATH"
 echo 'export PATH="$HOME/.aztec/bin:$PATH"' >> ~/.bashrc
-source ~/.bashrc
+export PATH="$HOME/.aztec/bin:$PATH"
 
-echo "Оновлюємо до останньої версії тестнету..."
+echo "AZTEC CLI встановлено та додано в PATH."
+
+echo ""
+echo "Крок 4/6: Оновлення AZTEC до останньої версії тестнету..."
+
 aztec-up alpha-testnet
 
-# Отримуємо IP сервера
+echo "Оновлення завершено."
+
+echo ""
+echo "Крок 5/6: Отримуємо IP сервера..."
+
 IP=$(curl -s https://api.ipify.org)
+echo "IP сервера: $IP"
 
-echo "Створюємо скрипт запуску ноди..."
+echo ""
+echo "Крок 6/6: Створення скриптів запуску і зупинки ноди..."
 
+# Скрипт запуску
 cat > $HOME/start_aztec_node.sh << EOL
 #!/bin/bash
 export PATH=\$PATH:\$HOME/.aztec/bin
@@ -49,11 +64,9 @@ aztec start --node --archiver --sequencer --auto-update config-and-version \\
   --sequencer.coinbase $COINBASE_ADDRESS \\
   --p2p.p2pIp $IP
 EOL
-
 chmod +x $HOME/start_aztec_node.sh
 
-echo "Створюємо скрипт безперервного запуску (авторестарту)..."
-
+# Скрипт безперервного запуску (авторестарт)
 cat > $HOME/run_forever.sh << EOL
 #!/bin/bash
 while true; do
@@ -62,33 +75,31 @@ while true; do
   sleep 90
 done
 EOL
-
 chmod +x $HOME/run_forever.sh
 
-echo "Створюємо скрипт для зупинки ноди..."
-
+# Скрипт зупинки
 cat > $HOME/stop_aztec_node.sh << EOL
 #!/bin/bash
-# Зупинка сесії screen з назвою 'aztec', щоб нода не перезапускалась
 screen -S aztec -X quit
 echo "Нода зупинена."
 EOL
-
 chmod +x $HOME/stop_aztec_node.sh
 
 echo ""
-echo "Для запуску ноди в окремій сесії screen натисніть 1"
+echo "Встановлення завершено."
+
+echo ""
+echo "Для запуску ноди в сесії screen натисніть 1"
 echo "Для зупинки ноди натисніть 2"
 read -p "Ваш вибір (1 або 2): " choice
 
 if [[ "$choice" == "1" ]]; then
-    # Перевіряємо, чи вже існує сесія screen з назвою aztec
     if screen -list | grep -q "\.aztec"; then
         echo "Сесія screen 'aztec' вже запущена."
     else
         echo "Створюємо сесію screen 'aztec' і запускаємо ноду..."
         screen -dmS aztec bash -c "$HOME/run_forever.sh"
-        echo "Нода запущена в сесії screen з назвою 'aztec'."
+        echo "Нода запущена."
     fi
 elif [[ "$choice" == "2" ]]; then
     echo "Зупиняємо ноду..."
