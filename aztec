@@ -79,15 +79,18 @@ EOL
             chmod +x $HOME/start_aztec_node.sh
 
             # run_forever script
-            cat > $HOME/run_forever.sh << EOL
+cat > $HOME/run_forever.sh << EOL
 #!/bin/bash
+export PATH=\$PATH:\$HOME/.aztec/bin
 while true; do
+  echo "Оновлення Aztec до останньої версії..."
+  aztec-up latest
   \$HOME/start_aztec_node.sh
   echo "Нода зупинилась. Перезапуск через 15 секунд..."
   sleep 15
 done
 EOL
-            chmod +x $HOME/run_forever.sh
+chmod +x $HOME/run_forever.sh
 
             # stop script
             cat > $HOME/stop_aztec_node.sh << EOL
